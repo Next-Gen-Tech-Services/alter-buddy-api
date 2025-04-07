@@ -1,10 +1,10 @@
 {
-  "DB_PATH": "mongodb+srv://mistryaksh1998:Oi0NKcWPa7iLFfEi@cluster0.wkykxg8.mongodb.net/?retryWrites=true&w=majority",
-  "JWT_SECRET": "JSONWEBTOKENSECRET",
+  "DB_PATH": "mongodb+srv://alterbuddy8:lrp1NloOTKnTiQyI@alter-buddy.latngxs.mongodb.net/?retryWrites=true&w=majority/alter-buddy",
+  "JWT_SECRET": "alter-buddy",
   "NODE_NO_WARNINGS": 1,
   "SUPPRESS_NO_CONFIG_WARNING": false,
   "JWT_EXPIRE": "3d",
-  "ABLY_KEY": "LrjjGQ.DPg-_Q:wmhnpNyD3kIbv-caW_glCxDlyIYwlT6pYQJTE4EJdCw",
+  "ABLY_KEY": "Fiv44w.ZkTEwA:O54qqKgcU-2KJh6IsbmDVAgf7pi7hNeWl5t72PVnOZI",
   "RAZORPAY_KEY_ID": "rzp_test_dJaErbvl4HcIbt",
   "RAZORPAY_KEY_SECRET": "qvqtpQ9NxlngJfPB88iHYOVl"
 }

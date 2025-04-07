@@ -1,10 +1,10 @@
 {
-  "DB_PATH": "mongodb+srv://mistryaksh1998:Oi0NKcWPa7iLFfEi@cluster0.wkykxg8.mongodb.net/?retryWrites=true&w=majority",
-  "JWT_SECRET": "JSONWEBTOKENSECRET",
+  "DB_PATH": "mongodb+srv://alterbuddy8:lrp1NloOTKnTiQyI@alter-buddy.latngxs.mongodb.net/?retryWrites=true&w=majority/alter-buddy",
+  "JWT_SECRET": "alter-buddy",
   "NODE_NO_WARNINGS": 1,
   "SUPPRESS_NO_CONFIG_WARNING": false,
   "JWT_EXPIRE": "3d",
-  "ABLY_KEY": "LrjjGQ.DPg-_Q:wmhnpNyD3kIbv-caW_glCxDlyIYwlT6pYQJTE4EJdCw",
+  "ABLY_KEY": "Fiv44w.ZkTEwA:O54qqKgcU-2KJh6IsbmDVAgf7pi7hNeWl5t72PVnOZI",
   "REACT_APP_100ms_SDK_KEY": "664cb3714286645c6d24c97a",
   "REACT_APP_100ms_SDK_SECRET": "KRmG-tHyGjU6FKqANwdDHpBIiF8mSBEJLt0A461leWY4KdR5MJTmr6XIXtjqm68b_ijgE_iRosIjzMgtEVk7l4lTeq0bqSQkCaBKPXLHDMRs2Zfb3jPk2-LDr_4XocFJy8DMZSJBWpWPgvpdyODOhluqOFJXUgkrjYqDg-NoxDg=",
   "REACT_APP_100MD_SDK_VIDEO_TEMPLATE": "664cb37b5afd7e4281e3192a",
