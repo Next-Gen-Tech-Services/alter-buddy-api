@@ -283,11 +283,15 @@ export class MentorCallSchedule implements IController {
       });
 
       const transporter = nodemailer.createTransport({
-        service: "smtp.mailtrap.io", // or any other email service provider
-        port: 2525,
+        host: "smtp-relay.brevo.com",
+        port: 587, // TLS port
+        secure: false, // Must be false for STARTTLS (TLS upgrade after connection)
         auth: {
-          user: "55b2d9a2d90121",
-          pass: "f56b3e52d8e9a3",
+          user: "achawda866@gmail.com",
+          pass: "r6p7KsULfXG1JC4A",
+        },
+        tls: {
+          rejectUnauthorized: true, // Set to false only in dev/testing if facing cert issues
         },
       });
 
