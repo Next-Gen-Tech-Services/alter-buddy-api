@@ -291,10 +291,11 @@ export class AuthenticationController implements IController {
 `,
         };
         var transporter = Nodemailer.createTransport({
-          service: "gmail",
+          service: "smtp.mailtrap.io", // or any other email service provider
+          port: 2525,
           auth: {
-            user: "alterbuddy8@gmail.com",
-            pass: "fhuoaoaoajsyakwq",
+            user: "55b2d9a2d90121",
+            pass: "f56b3e52d8e9a3",
           },
         });
         transporter.sendMail(mailOptions, function (error, info) {
@@ -546,10 +547,11 @@ export class AuthenticationController implements IController {
           };
 
           var transporter = Nodemailer.createTransport({
-            service: "gmail",
+            service: "smtp.mailtrap.io", // or any other email service provider
+            port: 2525,
             auth: {
-              user: "alterbuddy8@gmail.com",
-              pass: "fhuoaoaoajsyakwq",
+              user: "55b2d9a2d90121",
+              pass: "f56b3e52d8e9a3",
             },
           });
           transporter.sendMail(mailOptions, function (error, info) {
