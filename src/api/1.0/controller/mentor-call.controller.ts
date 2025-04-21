@@ -12,7 +12,7 @@ import moment from "moment-timezone";
 import nodemailer from "nodemailer";
 import mongoose from "mongoose";
 import { WalletController } from "./wallet.controller";
-
+import axios from "axios";
 export class MentorCallSchedule implements IController {
   public routes: IControllerRoutes[] = [];
 
@@ -203,39 +203,106 @@ export class MentorCallSchedule implements IController {
 
   public async BookSlotByUserId(req: Request, res: Response) {
     try {
-      const { userId, slotId, mentorId, callType } = req.body;
-      if (!userId || !slotId || !mentorId || !callType) {
+      const { userId, slotId, mentorId, callType, time, type } = req.body;
+      if (!userId || !mentorId || !callType || !time || !type) {
         return UnAuthorized(res, "not valid configs found");
       }
-
-      const slot = await CallSchedule.findOne({ _id: slotId });
+      if (type == "slot") {
+        if (!slotId) {
+          return UnAuthorized(res, "not valid configs found");
+        }
+      }
       const user = await User.findOne({ _id: userId });
       const mentor = await Mentor.findOne({ _id: mentorId });
-      const packages = await Packages.findOne({
-        packageType: callType,
-        mentorId: mentorId._id,
-      });
-      await BuddyCoins.findOneAndUpdate(
-        { userId: user._id },
-        { balance: slot }
-      );
-      const updateSlot = await CallSchedule.findOneAndUpdate(
-        {
-          slots: { $elemMatch: { _id: slotId } },
-        },
-        {
-          $set: {
-            callType: callType,
-            "slots.$.booked": true,
-            "slots.$.userId": userId,
-            "slots.$.status": "pending",
+      let hostJoinURL;
+      let guestJoinURL;
+      if (type == "slot") {
+        const slot = await CallSchedule.findOne({ _id: slotId });
+        const packages = await Packages.findOne({
+          packageType: callType,
+          mentorId: mentorId._id,
+        });
+        await BuddyCoins.findOneAndUpdate(
+          { userId: user._id },
+          { balance: slot }
+        );
+
+        const updateSlot = await CallSchedule.findOneAndUpdate(
+          {
+            slots: { $elemMatch: { _id: slotId } },
           },
-        }
-      );
-      return Ok(
-        res,
-        `Hey! ${user.name.firstName} ${user.name.lastName} your slot is booked with ${mentor.name.firstName} ${mentor.name.lastName}`
-      );
+          {
+            $set: {
+              callType: callType,
+              "slots.$.booked": true,
+              "slots.$.userId": userId,
+              "slots.$.status": "pending",
+            },
+          }
+        );
+      } else {
+        // === 100ms Integration ===
+        const roomResponse = await axios.post(
+          "https://api.100ms.live/v2/rooms",
+          {
+            name: `slot-booking-${Date.now()}`,
+            description: "Mentorship Session",
+            template_id:
+            callType == "video"
+                ? process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE
+                : process.env.REACT_APP_100MD_SDK_AUDIO_TEMPLATE,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const roomId = roomResponse.data.id;
+
+        // Generate room codes for host and guest
+        const hostCodeRes = await axios.post(
+          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const guestCodeRes = await axios.post(
+          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        hostJoinURL = `https://${
+          callType == "video"
+            ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
+            : process.env.REACT_APP_100MD_SDK_AUDIO_URL
+        }.app.100ms.live/meeting/${hostCodeRes.data.code}`;
+        guestJoinURL = `https://${
+          callType == "video"
+            ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
+            : process.env.REACT_APP_100MD_SDK_AUDIO_URL
+        }.app.100ms.live/meeting/${guestCodeRes.data.code}`;
+
+        console.log("Mentor (Host) join link:", hostJoinURL);
+      }
+
+      return Ok(res, {
+        message: `Hey! ${user.name.firstName} ${user.name.lastName} your slot is booked with ${mentor.name.firstName} ${mentor.name.lastName}`,
+        link: guestJoinURL,
+      });
     } catch (err) {
       return UnAuthorized(res, err);
     }
@@ -282,16 +349,63 @@ export class MentorCallSchedule implements IController {
         slots: { $elemMatch: { _id: slotId } },
       });
 
+      // === 100ms Integration ===
+      const roomResponse = await axios.post(
+        "https://api.100ms.live/v2/rooms",
+        {
+          name: `slot-booking-${Date.now()}`,
+          description: "Mentorship Session",
+          template_id: process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const roomId = roomResponse.data.id;
+
+      // Generate room codes for host and guest
+      const hostCodeRes = await axios.post(
+        `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const guestCodeRes = await axios.post(
+        `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const hostJoinURL = `https://alter-videoconf-1123.app.100ms.live/meeting/${hostCodeRes.data.code}`;
+      const guestJoinURL = `https://alter-videoconf-1123.app.100ms.live/meeting/${guestCodeRes.data.code}`;
+
+      console.log("Mentor (Host) join link:", hostJoinURL);
+
+      // === Email setup ===
       const transporter = nodemailer.createTransport({
         host: "smtp-relay.brevo.com",
-        port: 587, // TLS port
-        secure: false, // Must be false for STARTTLS (TLS upgrade after connection)
+        port: 587,
+        secure: false,
         auth: {
           user: "achawda866@gmail.com",
           pass: "r6p7KsULfXG1JC4A",
         },
         tls: {
-          rejectUnauthorized: true, // Set to false only in dev/testing if facing cert issues
+          rejectUnauthorized: true,
         },
       });
 
@@ -300,94 +414,87 @@ export class MentorCallSchedule implements IController {
         to: user.email,
         subject: "Your Mentor Slot Has Been Confirmed!",
         html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Slot Confirmation</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-          }
-          .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-          }
-          .email-header {
-            text-align: center;
-            background-color: #4CAF50;
-            padding: 20px;
-            color: #ffffff;
-            border-radius: 5px 5px 0 0;
-          }
-          .email-header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .email-body {
-            padding: 20px;
-            color: #333333;
-          }
-          .email-body p {
-            line-height: 1.5;
-          }
-          .email-footer {
-            text-align: center;
-            font-size: 12px;
-            color: #999999;
-            margin-top: 20px;
-          }
-          .join-button {
-            display: inline-block;
-            padding: 15px 25px;
-            background-color: #4CAF50;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
-          }
-          .join-button:hover {
-            background-color: #45a049;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="email-container">
-          <div class="email-header">
-            <h1>Slot Confirmation</h1>
-          </div>
-          <div class="email-body">
-            <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
-            <p>Your mentor has <strong>accepted</strong> your request for a session!</p>
-            <p>Here are the details:</p>
-            <p><strong>Mentor:</strong> ${mentor?.name?.firstName} ${
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Slot Confirmation</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              background-color: #f4f4f4;
+              margin: 0;
+              padding: 20px;
+            }
+            .email-container {
+              max-width: 600px;
+              margin: 0 auto;
+              background-color: #ffffff;
+              padding: 20px;
+              border-radius: 5px;
+              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            }
+            .email-header {
+              text-align: center;
+              background-color: #4CAF50;
+              padding: 20px;
+              color: #ffffff;
+              border-radius: 5px 5px 0 0;
+            }
+            .email-body {
+              padding: 20px;
+              color: #333333;
+            }
+            .join-button {
+              display: inline-block;
+              padding: 15px 25px;
+              background-color: #4CAF50;
+              color: #ffffff;
+              text-decoration: none;
+              border-radius: 5px;
+              margin: 20px 0;
+            }
+            .join-button:hover {
+              background-color: #45a049;
+            }
+            .email-footer {
+              text-align: center;
+              font-size: 12px;
+              color: #999999;
+              margin-top: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="email-container">
+            <div class="email-header">
+              <h1>Slot Confirmation</h1>
+            </div>
+            <div class="email-body">
+              <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
+              <p>Your mentor has <strong>accepted</strong> your request for a session!</p>
+              <p><strong>Mentor:</strong> ${mentor?.name?.firstName} ${
           mentor?.name?.lastName
         }</p>
-            <p><strong>Date:</strong> ${moment(slotData.slotsDate).format(
-              "lll"
-            )}</p>
-            <p><strong>Time:</strong> ${
-              slotData.slots.find((s) => s._id == slotId).time
-            }</p>
-            <p>You can join the session at the scheduled time! , you will receive a session link 15 mins before the session time</p>
-            <p>If you have any issues, feel free to contact support.</p>
-            <p>Thank you!</p>
+              <p><strong>Date:</strong> ${moment(slotData.slotsDate).format(
+                "lll"
+              )}</p>
+              <p><strong>Time:</strong> ${
+                slotData.slots.find((s) => s._id == slotId).time
+              }</p>
+              <p>You can join the session using the link below:</p>
+              <p><a href="${guestJoinURL}" class="join-button">Join Session</a></p>
+              <p>If you have any issues, feel free to contact support.</p>
+              <p>Thank you!</p>
+            </div>
+            <div class="email-footer">
+              <p>&copy; 2024 Your Company. All rights reserved.</p>
+            </div>
           </div>
-          <div class="email-footer">
-            <p>&copy; 2024 Your Company. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
+        </body>
+        </html>
+      `,
       };
 
       transporter.sendMail(mailOptions, async (error, info) => {
