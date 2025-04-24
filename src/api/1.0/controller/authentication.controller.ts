@@ -291,15 +291,15 @@ export class AuthenticationController implements IController {
 `,
         };
         var transporter = Nodemailer.createTransport({
-          host: "smtp-relay.brevo.com",
+          host: process.env.SMTP_HOST,
           port: 587, // TLS port
-          secure: false, // Must be false for STARTTLS (TLS upgrade after connection)
+          secure: false,
           auth: {
-            user: "achawda866@gmail.com",
-            pass: "r6p7KsULfXG1JC4A",
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
           },
           tls: {
-            rejectUnauthorized: true, // Set to false only in dev/testing if facing cert issues
+            rejectUnauthorized: true,
           },
         });
         transporter.sendMail(mailOptions, function (error, info) {
@@ -551,17 +551,17 @@ export class AuthenticationController implements IController {
           };
 
           var transporter = Nodemailer.createTransport({
-               host: "smtp-relay.brevo.com",
-               port: 587, // TLS port
-               secure: false, // Must be false for STARTTLS (TLS upgrade after connection)
-               auth: {
-                 user: "achawda866@gmail.com",
-                 pass: "r6p7KsULfXG1JC4A",
-               },
-               tls: {
-                 rejectUnauthorized: true, // Set to false only in dev/testing if facing cert issues
-               },
-          });
+                  host: process.env.SMTP_HOST,
+                  port: 587, // TLS port
+                  secure: false,
+                  auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS,
+                  },
+                  tls: {
+                    rejectUnauthorized: true,
+                  },
+                });
           transporter.sendMail(mailOptions, function (error, info) {
             if (error) {
               console.log(error);

@@ -410,12 +410,12 @@ export class MentorCallSchedule implements IController {
 
       // === Email setup ===
       const transporter = nodemailer.createTransport({
-        host: "smtp-relay.brevo.com",
-        port: 587,
+        host: process.env.SMTP_HOST,
+        port: 587, // TLS port
         secure: false,
         auth: {
-          user: "achawda866@gmail.com",
-          pass: "r6p7KsULfXG1JC4A",
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
         },
         tls: {
           rejectUnauthorized: true,
