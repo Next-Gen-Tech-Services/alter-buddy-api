@@ -216,17 +216,31 @@ export class MentorCallSchedule implements IController {
       const mentor = await Mentor.findOne({ _id: mentorId });
       let hostJoinURL;
       let guestJoinURL;
+      const packages = await Packages.findOne({
+        packageType: callType,
+        mentorId: mentorId._id,
+      });
+      const userWallet = await BuddyCoins.findOne({ userId: userId });
+
+      if (!userWallet) {
+        return UnAuthorized(res, "not valid configs found");
+      }
+      if (userWallet.balance < packages.price) {
+        return
+          UnAuthorized(
+            res,
+            `You don't have enough coins to book this slot. Please recharge your wallet.`
+          );
+      }
+      const slotBalance = userWallet.balance - packages.price;
+
+      await BuddyCoins.findOneAndUpdate(
+        { userId: user._id },
+        { balance: slotBalance }
+      );
+
       if (type == "slot") {
         const slot = await CallSchedule.findOne({ _id: slotId });
-        const packages = await Packages.findOne({
-          packageType: callType,
-          mentorId: mentorId._id,
-        });
-        await BuddyCoins.findOneAndUpdate(
-          { userId: user._id },
-          { balance: slot }
-        );
-
         const updateSlot = await CallSchedule.findOneAndUpdate(
           {
             slots: { $elemMatch: { _id: slotId } },
