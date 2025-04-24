@@ -217,15 +217,15 @@ export class MentorCallSchedule implements IController {
       let hostJoinURL;
       let guestJoinURL;
       const packages = await Packages.findOne({
-        packageType: 'chat',
+        packageType: "chat",
         mentorId: mentor._id,
       });
       const userWallet = await BuddyCoins.findOne({ userId: userId });
-      
+
       if (!userWallet) {
         return UnAuthorized(res, "not valid configs found");
       }
-      
+
       const slotBalance = userWallet.balance - packages.price * parseInt(time);
 
       await BuddyCoins.findOneAndUpdate(
@@ -248,66 +248,69 @@ export class MentorCallSchedule implements IController {
           }
         );
       }
-      
-      // === 100ms Integration ===
-      const roomResponse = await axios.post(
-        "https://api.100ms.live/v2/rooms",
-        {
-          name: `slot-booking-${Date.now()}`,
-          description: "Mentorship Session",
-          template_id:
-            callType == "video"
-              ? process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE
-              : process.env.REACT_APP_100MD_SDK_AUDIO_TEMPLATE,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-            "Content-Type": "application/json",
+      if (callType == "audio" || callType == "video") {
+        // === 100ms Integration ===
+        const roomResponse = await axios.post(
+          "https://api.100ms.live/v2/rooms",
+          {
+            name: `slot-booking-${Date.now()}`,
+            description: "Mentorship Session",
+            template_id:
+              callType == "video"
+                ? process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE
+                : process.env.REACT_APP_100MD_SDK_AUDIO_TEMPLATE,
           },
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      const roomId = roomResponse.data.id;
+        const roomId = roomResponse.data.id;
 
-      // Generate room codes for host and guest
-      const hostCodeRes = await axios.post(
-        `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+        // Generate room codes for host and guest
+        const hostCodeRes = await axios.post(
+          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      const guestCodeRes = await axios.post(
-        `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+        const guestCodeRes = await axios.post(
+          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      hostJoinURL = `https://${
-        callType == "video"
-          ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
-          : process.env.REACT_APP_100MD_SDK_AUDIO_URL
-      }.app.100ms.live/meeting/${hostCodeRes.data.code}`;
-      guestJoinURL = `https://${
-        callType == "video"
-          ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
-          : process.env.REACT_APP_100MD_SDK_AUDIO_URL
-      }.app.100ms.live/meeting/${guestCodeRes.data.code}`;
+        hostJoinURL = `https://${
+          callType == "video"
+            ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
+            : process.env.REACT_APP_100MD_SDK_AUDIO_URL
+        }.app.100ms.live/meeting/${hostCodeRes.data.code}`;
+        guestJoinURL = `https://${
+          callType == "video"
+            ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
+            : process.env.REACT_APP_100MD_SDK_AUDIO_URL
+        }.app.100ms.live/meeting/${guestCodeRes.data.code}`;
 
-      console.log("Mentor (Host) join link:", hostJoinURL);
+        console.log("Mentor (Host) join link:", hostJoinURL);
+      } else {
+        guestJoinURL = `https://alterbuddy.com/user/chat/${mentor._id}/${mentor._id}`; 
+      }
 
-       // === Email setup ===
-       const transporter = nodemailer.createTransport({
+      // === Email setup ===
+      const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: 587, // TLS port
         secure: false,
@@ -385,9 +388,7 @@ export class MentorCallSchedule implements IController {
             <div class="email-body">
               <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
               <p>Your mentor has <strong>accepted</strong> your request for a session!</p>
-              <p><strong>Mentor:</strong> ${mentor?.name?.firstName} ${
-          mentor?.name?.lastName
-        }</p>
+              <p><strong>Mentor:</strong> ${mentor?.name?.firstName} ${mentor?.name?.lastName}</p>
              
               <p>You can join the session using the link below:</p>
               <p><a href="${guestJoinURL}" class="join-button">Join Session</a></p>
@@ -476,8 +477,7 @@ export class MentorCallSchedule implements IController {
       const hostCodeRes = await axios.post(
         `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
         {
-          "name": "Jatin"
-
+          name: "Jatin",
         },
         {
           headers: {
@@ -490,7 +490,7 @@ export class MentorCallSchedule implements IController {
       const guestCodeRes = await axios.post(
         `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
         {
-          "name": "Mudit"
+          name: "Mudit",
         },
         {
           headers: {
