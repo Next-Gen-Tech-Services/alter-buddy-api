@@ -217,28 +217,21 @@ export class MentorCallSchedule implements IController {
       let hostJoinURL;
       let guestJoinURL;
       const packages = await Packages.findOne({
-        packageType: callType,
-        mentorId: mentorId._id,
+        packageType: 'chat',
+        mentorId: mentor._id,
       });
       const userWallet = await BuddyCoins.findOne({ userId: userId });
-
+      
       if (!userWallet) {
         return UnAuthorized(res, "not valid configs found");
       }
-      if (userWallet.balance < packages.price) {
-        return
-          UnAuthorized(
-            res,
-            `You don't have enough coins to book this slot. Please recharge your wallet.`
-          );
-      }
-      const slotBalance = userWallet.balance - packages.price;
+      
+      const slotBalance = userWallet.balance - packages.price * parseInt(time);
 
       await BuddyCoins.findOneAndUpdate(
         { userId: user._id },
         { balance: slotBalance }
       );
-
       if (type == "slot") {
         const slot = await CallSchedule.findOne({ _id: slotId });
         const updateSlot = await CallSchedule.findOneAndUpdate(
@@ -254,64 +247,64 @@ export class MentorCallSchedule implements IController {
             },
           }
         );
-      } else {
-        // === 100ms Integration ===
-        const roomResponse = await axios.post(
-          "https://api.100ms.live/v2/rooms",
-          {
-            name: `slot-booking-${Date.now()}`,
-            description: "Mentorship Session",
-            template_id:
-            callType == "video"
-                ? process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE
-                : process.env.REACT_APP_100MD_SDK_AUDIO_TEMPLATE,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        const roomId = roomResponse.data.id;
-
-        // Generate room codes for host and guest
-        const hostCodeRes = await axios.post(
-          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        const guestCodeRes = await axios.post(
-          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        hostJoinURL = `https://${
-          callType == "video"
-            ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
-            : process.env.REACT_APP_100MD_SDK_AUDIO_URL
-        }.app.100ms.live/meeting/${hostCodeRes.data.code}`;
-        guestJoinURL = `https://${
-          callType == "video"
-            ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
-            : process.env.REACT_APP_100MD_SDK_AUDIO_URL
-        }.app.100ms.live/meeting/${guestCodeRes.data.code}`;
-
-        console.log("Mentor (Host) join link:", hostJoinURL);
       }
+      
+      // === 100ms Integration ===
+      const roomResponse = await axios.post(
+        "https://api.100ms.live/v2/rooms",
+        {
+          name: `slot-booking-${Date.now()}`,
+          description: "Mentorship Session",
+          template_id:
+            callType == "video"
+              ? process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE
+              : process.env.REACT_APP_100MD_SDK_AUDIO_TEMPLATE,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const roomId = roomResponse.data.id;
+
+      // Generate room codes for host and guest
+      const hostCodeRes = await axios.post(
+        `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const guestCodeRes = await axios.post(
+        `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      hostJoinURL = `https://${
+        callType == "video"
+          ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
+          : process.env.REACT_APP_100MD_SDK_AUDIO_URL
+      }.app.100ms.live/meeting/${hostCodeRes.data.code}`;
+      guestJoinURL = `https://${
+        callType == "video"
+          ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
+          : process.env.REACT_APP_100MD_SDK_AUDIO_URL
+      }.app.100ms.live/meeting/${guestCodeRes.data.code}`;
+
+      console.log("Mentor (Host) join link:", hostJoinURL);
 
       return Ok(res, {
         message: `Hey! ${user.name.firstName} ${user.name.lastName} your slot is booked with ${mentor.name.firstName} ${mentor.name.lastName}`,
@@ -384,7 +377,10 @@ export class MentorCallSchedule implements IController {
       // Generate room codes for host and guest
       const hostCodeRes = await axios.post(
         `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
-        {},
+        {
+          "name": "Jatin"
+
+        },
         {
           headers: {
             Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
@@ -395,7 +391,9 @@ export class MentorCallSchedule implements IController {
 
       const guestCodeRes = await axios.post(
         `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
-        {},
+        {
+          "name": "Mudit"
+        },
         {
           headers: {
             Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
@@ -408,6 +406,7 @@ export class MentorCallSchedule implements IController {
       const guestJoinURL = `https://alter-videoconf-1123.app.100ms.live/meeting/${guestCodeRes.data.code}`;
 
       console.log("Mentor (Host) join link:", hostJoinURL);
+      console.log("Guest Host join link:", guestJoinURL);
 
       // === Email setup ===
       const transporter = nodemailer.createTransport({
