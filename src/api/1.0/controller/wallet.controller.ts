@@ -165,7 +165,7 @@ export class WalletController implements IController {
         return UnAuthorized(res, "Invalid recharge amount");
       }
 
-      const rechargeAmount = wallet.balance + amount;
+      const rechargeAmount = wallet.balance + amount / 100;
 
       const updatedWallet = await BuddyCoins.findByIdAndUpdate(
         wallet._id,
