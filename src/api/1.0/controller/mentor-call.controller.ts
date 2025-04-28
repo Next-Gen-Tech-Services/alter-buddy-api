@@ -306,107 +306,105 @@ export class MentorCallSchedule implements IController {
 
         console.log("Mentor (Host) join link:", hostJoinURL);
       } else {
-        guestJoinURL = `https://alterbuddy.com/user/chat/${mentor._id}/${mentor._id}`;
+        guestJoinURL = `https://alterbuddy.com/user/chat/${mentor._id}/${mentor._id}`; 
       }
 
       // === Email setup ===
-      if (time != 45 && time != 60) {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: 587, // TLS port
-          secure: false,
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-          tls: {
-            rejectUnauthorized: true,
-          },
-        });
-        const mailOptions = {
-          from: process.env.SMTP_FROM,
-          to: user.email,
-          subject: "Your Mentor Slot Has Been Confirmed!",
-          html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Slot Confirmation</title>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f4;
-                margin: 0;
-                padding: 20px;
-              }
-              .email-container {
-                max-width: 600px;
-                margin: 0 auto;
-                background-color: #ffffff;
-                padding: 20px;
-                border-radius: 5px;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-              }
-              .email-header {
-                text-align: center;
-                background-color: #4CAF50;
-                padding: 20px;
-                color: #ffffff;
-                border-radius: 5px 5px 0 0;
-              }
-              .email-body {
-                padding: 20px;
-                color: #333333;
-              }
-              .join-button {
-                display: inline-block;
-                padding: 15px 25px;
-                background-color: #4CAF50;
-                color: #ffffff;
-                text-decoration: none;
-                border-radius: 5px;
-                margin: 20px 0;
-              }
-              .join-button:hover {
-                background-color: #45a049;
-              }
-              .email-footer {
-                text-align: center;
-                font-size: 12px;
-                color: #999999;
-                margin-top: 20px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="email-container">
-              <div class="email-header">
-                <h1>Slot Confirmation</h1>
-              </div>
-              <div class="email-body">
-                <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
-                <p>Your mentor has <strong>accepted</strong> your request for a session!</p>
-                <p><strong>Mentor:</strong> ${mentor?.name?.firstName} ${mentor?.name?.lastName}</p>
-               
-                <p>You can join the session using the link below:</p>
-                <p><a href="${guestJoinURL}" class="join-button">Join Session</a></p>
-                <p>If you have any issues, feel free to contact support.</p>
-                <p>Thank you!</p>
-              </div>
-              <div class="email-footer">
-                <p>&copy; 2025 Alter Buddy. All rights reserved.</p>
-              </div>
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: 587, // TLS port
+        secure: false,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+        tls: {
+          rejectUnauthorized: true,
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.SMTP_FROM,
+        to: user.email,
+        subject: "Your Mentor Slot Has Been Confirmed!",
+        html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Slot Confirmation</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              background-color: #f4f4f4;
+              margin: 0;
+              padding: 20px;
+            }
+            .email-container {
+              max-width: 600px;
+              margin: 0 auto;
+              background-color: #ffffff;
+              padding: 20px;
+              border-radius: 5px;
+              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            }
+            .email-header {
+              text-align: center;
+              background-color: #4CAF50;
+              padding: 20px;
+              color: #ffffff;
+              border-radius: 5px 5px 0 0;
+            }
+            .email-body {
+              padding: 20px;
+              color: #333333;
+            }
+            .join-button {
+              display: inline-block;
+              padding: 15px 25px;
+              background-color: #4CAF50;
+              color: #ffffff;
+              text-decoration: none;
+              border-radius: 5px;
+              margin: 20px 0;
+            }
+            .join-button:hover {
+              background-color: #45a049;
+            }
+            .email-footer {
+              text-align: center;
+              font-size: 12px;
+              color: #999999;
+              margin-top: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="email-container">
+            <div class="email-header">
+              <h1>Slot Confirmation</h1>
             </div>
-          </body>
-          </html>
-        `,
-        };
+            <div class="email-body">
+              <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
+              <p>Your mentor has <strong>accepted</strong> your request for a session!</p>
+              <p><strong>Mentor:</strong> ${mentor?.name?.firstName} ${mentor?.name?.lastName}</p>
+             
+              <p>You can join the session using the link below:</p>
+              <p><a href="${guestJoinURL}" class="join-button">Join Session</a></p>
+              <p>If you have any issues, feel free to contact support.</p>
+              <p>Thank you!</p>
+            </div>
+            <div class="email-footer">
+              <p>&copy; 2025 Alter Buddy. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      };
 
-        transporter.sendMail(mailOptions);
-      }
-
+      transporter.sendMail(mailOptions);
       return Ok(res, {
         message: `Hey! ${user.name.firstName} ${user.name.lastName} your slot is booked with ${mentor.name.firstName} ${mentor.name.lastName}`,
         link: guestJoinURL,
