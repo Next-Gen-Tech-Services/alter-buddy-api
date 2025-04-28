@@ -8,10 +8,10 @@ const ChatSchema = new mongoose.Schema<IChatProps>(
       mentor: { type: mongoose.Schema.Types.ObjectId, ref: "Mentor" },
     },
     sessionDetails: {
-      roomId: { type: mongoose.Schema.Types.String, required: true },
+      roomId: { type: mongoose.Schema.Types.String, required: false },
       roomCode: {
-        host: { type: mongoose.Schema.Types.String, required: true },
-        mentor: { type: mongoose.Schema.Types.String, required: true },
+        host: { type: mongoose.Schema.Types.String, required: false },
+        mentor: { type: mongoose.Schema.Types.String, required: false },
       },
       roomName: { type: mongoose.Schema.Types.String, required: true },
       callType: {
