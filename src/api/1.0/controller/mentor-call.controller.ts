@@ -13,6 +13,14 @@ import nodemailer from "nodemailer";
 import mongoose from "mongoose";
 import { WalletController } from "./wallet.controller";
 import axios from "axios";
+
+function generateRandomRoomId(length = 12): string {
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from({ length }, () =>
+    characters.charAt(Math.floor(Math.random() * characters.length))
+  ).join("");
+}
 export class MentorCallSchedule implements IController {
   public routes: IControllerRoutes[] = [];
 
@@ -207,56 +215,59 @@ export class MentorCallSchedule implements IController {
       if (!userId || !mentorId || !callType || !time || !type) {
         return UnAuthorized(res, "not valid configs found");
       }
-      if (type == "slot") {
-        if (!slotId) {
-          return UnAuthorized(res, "not valid configs found");
-        }
+      if (type === "slot" && !slotId) {
+        return UnAuthorized(res, "Slot ID is required for booking a slot.");
       }
-      const user = await User.findOne({ _id: userId });
-      const mentor = await Mentor.findOne({ _id: mentorId });
-      let hostJoinURL;
-      let guestJoinURL;
-      const packages = await Packages.findOne({
-        packageType: "chat",
-        mentorId: mentor._id,
-      });
-      const userWallet = await BuddyCoins.findOne({ userId: userId });
 
-      if (!userWallet) {
-        return UnAuthorized(res, "not valid configs found");
+      const user = await User.findById(userId).lean();
+      const mentor = await Mentor.findById(mentorId).lean();
+      if (!user || !mentor) {
+        return UnAuthorized(res, "User or Mentor not found.");
+      }
+
+      const packages = await Packages.findOne({
+        packageType: callType,
+        mentorId: mentor._id,
+      }).lean();
+      const userWallet = await BuddyCoins.findOne({ userId }).lean();
+      if (!packages || !userWallet) {
+        return UnAuthorized(res, "Package or Wallet not found.");
       }
 
       const slotBalance = userWallet.balance - packages.price * parseInt(time);
+      if (slotBalance < 0) {
+        return UnAuthorized(res, "Insufficient balance.");
+      }
 
-      await BuddyCoins.findOneAndUpdate(
-        { userId: user._id },
-        { balance: slotBalance }
-      );
-      if (type == "slot") {
-        const slot = await CallSchedule.findOne({ _id: slotId });
-        const updateSlot = await CallSchedule.findOneAndUpdate(
-          {
-            slots: { $elemMatch: { _id: slotId } },
-          },
+      await BuddyCoins.updateOne({ userId }, { balance: slotBalance });
+
+      if (type === "slot") {
+        await CallSchedule.updateOne(
+          { slots: { $elemMatch: { _id: slotId } } },
           {
             $set: {
-              callType: callType,
               "slots.$.booked": true,
               "slots.$.userId": userId,
               "slots.$.status": "pending",
+              "slots.$.callType": callType,
+              "slots.$.duration": time,
             },
           }
         );
       }
-      if (callType == "audio" || callType == "video") {
-        // === 100ms Integration ===
+
+      let hostJoinURL: string | undefined;
+      let guestJoinURL: string | undefined;
+      let roomId: string = generateRandomRoomId();
+
+      if (callType === "audio" || callType === "video") {
         const roomResponse = await axios.post(
           "https://api.100ms.live/v2/rooms",
           {
             name: `slot-booking-${Date.now()}`,
             description: "Mentorship Session",
             template_id:
-              callType == "video"
+              callType === "video"
                 ? process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE
                 : process.env.REACT_APP_100MD_SDK_AUDIO_TEMPLATE,
           },
@@ -268,149 +279,258 @@ export class MentorCallSchedule implements IController {
           }
         );
 
-        const roomId = roomResponse.data.id;
+        roomId = roomResponse.data.id || roomId;
 
-        // Generate room codes for host and guest
-        const hostCodeRes = await axios.post(
-          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const [hostCodeRes, guestCodeRes] = await Promise.all([
+          axios.post(
+            `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+              },
+            }
+          ),
+          axios.post(
+            `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+              },
+            }
+          ),
+        ]);
 
-        const guestCodeRes = await axios.post(
-          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        hostJoinURL = `https://${
-          callType == "video"
+        const baseURL =
+          callType === "video"
             ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
-            : process.env.REACT_APP_100MD_SDK_AUDIO_URL
-        }.app.100ms.live/meeting/${hostCodeRes.data.code}`;
-        guestJoinURL = `https://${
-          callType == "video"
-            ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
-            : process.env.REACT_APP_100MD_SDK_AUDIO_URL
-        }.app.100ms.live/meeting/${guestCodeRes.data.code}`;
+            : process.env.REACT_APP_100MD_SDK_AUDIO_URL;
 
-        console.log("Mentor (Host) join link:", hostJoinURL);
+        hostJoinURL = `https://${baseURL}.app.100ms.live/meeting/${hostCodeRes.data.code}`;
+        guestJoinURL = `https://${baseURL}.app.100ms.live/meeting/${guestCodeRes.data.code}`;
       } else {
-        guestJoinURL = `https://alterbuddy.com/user/chat/${mentor._id}/${mentor._id}`; 
+        guestJoinURL = `https://alterbuddy.com/user/chat/${mentor._id}/${roomId}`;
+        hostJoinURL = `https://alterbuddy.com/user/chat/${mentor._id}/${roomId}`;
+      }
+      const startTime = new Date();
+      const endTime = new Date(startTime.getTime() + parseInt(time) * 60000); // Add minutes in milliseconds
+
+      if (type != "slot") {
+        await Chat.create({
+          users: {
+            user: userId,
+            mentor: mentorId,
+          },
+          sessionDetails: {
+            roomId,
+            roomCode: {
+              host: hostJoinURL ? hostJoinURL.split("/").pop() : undefined,
+              mentor: guestJoinURL ? guestJoinURL.split("/").pop() : undefined,
+            },
+            roomName: `Session-${Date.now()}`,
+            callType,
+            duration: `${time} mins`,
+            startTime,
+            endTime,
+          },
+          status: "PENDING",
+        });
+
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: 587,
+          secure: false,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+          tls: { rejectUnauthorized: true },
+        });
+
+        // --- Send Email to USER ---
+        const userMailOptions = {
+          from: process.env.SMTP_FROM,
+          to: user.email,
+          subject: "Your Mentor Slot Has Been Confirmed!",
+          html: `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>Slot Confirmation</title>
+                <style><!DOCTYPE html>
+              <html>
+              <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Slot Confirmation</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  background-color: #f4f4f4;
+                  margin: 0;
+                  padding: 20px;
+                }
+                .email-container {
+                  max-width: 600px;
+                  margin: 0 auto;
+                  background-color: #ffffff;
+                  padding: 20px;
+                  border-radius: 5px;
+                  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                }
+                .email-header {
+                  text-align: center;
+                  background-color: #4caf50;
+                  padding: 20px;
+                  color: #ffffff;
+                  border-radius: 5px 5px 0 0;
+                }
+                .email-body {
+                  padding: 20px;
+                  color: #333333;
+                }
+                .join-button {
+                  display: inline-block;
+                  padding: 15px 25px;
+                  background-color: #4caf50;
+                  color: #ffffff;
+                  text-decoration: none;
+                  border-radius: 5px;
+                  margin: 20px 0;
+                }
+                .join-button:hover {
+                  background-color: #45a049;
+                }
+                .email-footer {
+                  text-align: center;
+                  font-size: 12px;
+                  color: #999999;
+                  margin-top: 20px;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="email-container">
+                <div class="email-header">
+                  <h1>Slot Confirmation</h1>
+                </div>
+                <div class="email-body">
+                  <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
+                  <p>Your mentor <strong>${mentor.name.firstName} ${mentor.name.lastName}</strong> has confirmed your session!</p>
+                  <p>Click below to join your session:</p>
+                  <p style="text-align: center;">
+                    <a href="${guestJoinURL}" class="join-button">Join Session</a>
+                  </p>
+                  <p>If you have any questions, please contact support.</p>
+                  <p>Thank you!</p>
+                </div>
+                <div class="email-footer">
+                  <p>&copy; 2025 Alter Buddy. All rights reserved.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+  
+          `,
+        };
+        await transporter.sendMail(userMailOptions);
+
+        // --- Send Email to MENTOR ---
+        const mentorMailOptions = {
+          from: process.env.SMTP_FROM,
+          to: mentor.contact.email,
+          subject: "New Mentorship Session Booked!",
+          html: `
+            <!DOCTYPE html>
+              <html>
+              <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Slot Confirmation</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  background-color: #f4f4f4;
+                  margin: 0;
+                  padding: 20px;
+                }
+                .email-container {
+                  max-width: 600px;
+                  margin: 0 auto;
+                  background-color: #ffffff;
+                  padding: 20px;
+                  border-radius: 5px;
+                  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                }
+                .email-header {
+                  text-align: center;
+                  background-color: #4caf50;
+                  padding: 20px;
+                  color: #ffffff;
+                  border-radius: 5px 5px 0 0;
+                }
+                .email-body {
+                  padding: 20px;
+                  color: #333333;
+                }
+                .join-button {
+                  display: inline-block;
+                  padding: 15px 25px;
+                  background-color: #4caf50;
+                  color: #ffffff;
+                  text-decoration: none;
+                  border-radius: 5px;
+                  margin: 20px 0;
+                }
+                .join-button:hover {
+                  background-color: #45a049;
+                }
+                .email-footer {
+                  text-align: center;
+                  font-size: 12px;
+                  color: #999999;
+                  margin-top: 20px;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="email-container">
+                <div class="email-header">
+                  <h1>Slot Confirmation</h1>
+                </div>
+                <div class="email-body">
+                  <p>Hi ${mentor.name.firstName} ${mentor.name.lastName},</p>
+                  <p>A new mentorship session has been booked by <strong>${user.name.firstName} ${user.name.lastName}</strong>.</p>
+                  <p>Click below to join the session:</p>
+                  <p style="text-align: center;" >
+                    <a href="${hostJoinURL}" class="join-button" style="background: #45a049; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Join as Mentor</a>
+                  </p>
+                  <p>If you have any issues, feel free to contact support.</p>
+                  <p>Thank you!</p>
+                </div>
+                <div class="email-footer">
+                  <p>&copy; 2025 Alter Buddy. All rights reserved.</p>
+                </div>
+              </div>
+            </body>
+            </html>`,
+        };
+        await transporter.sendMail(mentorMailOptions);
       }
 
-      // === Email setup ===
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: 587, // TLS port
-        secure: false,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-        tls: {
-          rejectUnauthorized: true,
-        },
-      });
-
-      const mailOptions = {
-        from: process.env.SMTP_FROM,
-        to: user.email,
-        subject: "Your Mentor Slot Has Been Confirmed!",
-        html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Slot Confirmation</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              background-color: #f4f4f4;
-              margin: 0;
-              padding: 20px;
-            }
-            .email-container {
-              max-width: 600px;
-              margin: 0 auto;
-              background-color: #ffffff;
-              padding: 20px;
-              border-radius: 5px;
-              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            }
-            .email-header {
-              text-align: center;
-              background-color: #4CAF50;
-              padding: 20px;
-              color: #ffffff;
-              border-radius: 5px 5px 0 0;
-            }
-            .email-body {
-              padding: 20px;
-              color: #333333;
-            }
-            .join-button {
-              display: inline-block;
-              padding: 15px 25px;
-              background-color: #4CAF50;
-              color: #ffffff;
-              text-decoration: none;
-              border-radius: 5px;
-              margin: 20px 0;
-            }
-            .join-button:hover {
-              background-color: #45a049;
-            }
-            .email-footer {
-              text-align: center;
-              font-size: 12px;
-              color: #999999;
-              margin-top: 20px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="email-container">
-            <div class="email-header">
-              <h1>Slot Confirmation</h1>
-            </div>
-            <div class="email-body">
-              <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
-              <p>Your mentor has <strong>accepted</strong> your request for a session!</p>
-              <p><strong>Mentor:</strong> ${mentor?.name?.firstName} ${mentor?.name?.lastName}</p>
-             
-              <p>You can join the session using the link below:</p>
-              <p><a href="${guestJoinURL}" class="join-button">Join Session</a></p>
-              <p>If you have any issues, feel free to contact support.</p>
-              <p>Thank you!</p>
-            </div>
-            <div class="email-footer">
-              <p>&copy; 2025 Alter Buddy. All rights reserved.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-      };
-
-      transporter.sendMail(mailOptions);
       return Ok(res, {
-        message: `Hey! ${user.name.firstName} ${user.name.lastName} your slot is booked with ${mentor.name.firstName} ${mentor.name.lastName}`,
+        message: `Hey! ${user.name.firstName} ${user.name.lastName}, your slot is booked with ${mentor.name.firstName} ${mentor.name.lastName}`,
         link: guestJoinURL,
       });
     } catch (err) {
-      return UnAuthorized(res, err);
+      console.error("BookSlot Error:", err);
+      return UnAuthorized(
+        res,
+        err instanceof Error ? err.message : "Unknown error occurred."
+      );
     }
   }
 
@@ -446,189 +566,248 @@ export class MentorCallSchedule implements IController {
     try {
       const { slotId, mentorId, userId } = req.body;
       if (!slotId || !mentorId || !userId) {
-        return UnAuthorized(res, "not valid configs found");
+        return UnAuthorized(res, "Not valid configs found");
       }
 
-      const user = await User.findOne({ _id: userId });
-      const mentor = await Mentor.findOne({ _id: mentorId });
+      const user = await User.findById(userId).lean();
+      const mentor = await Mentor.findById(mentorId).lean();
       const slotData = await CallSchedule.findOne({
         slots: { $elemMatch: { _id: slotId } },
+      }).lean();
+
+      if (!user || !mentor || !slotData) {
+        return UnAuthorized(res, "User, Mentor, or Slot not found.");
+      }
+      const slot = slotData.slots.find((s) => String(s._id) === slotId);
+      if (!slot) {
+        return UnAuthorized(res, "Slot not found in CallSchedule.");
+      }
+      let hostJoinURL: string | undefined;
+      let guestJoinURL: string | undefined;
+      let roomId: string = generateRandomRoomId();
+console.log(slot);
+
+      const startTime = moment(`${slotData.slotsDate} ${slot.time}`, "YYYY-MM-DD hh:mm A");
+
+      // Step 2: Create endTime
+      const endTime = startTime.clone().add(slot.duration, 'minutes');
+
+      await Chat.create({
+        users: {
+          user: userId,
+          mentor: mentorId,
+        },
+        sessionDetails: {
+          roomId,
+          roomCode: {
+            host: hostJoinURL ? hostJoinURL.split("/").pop() : undefined,
+            mentor: guestJoinURL ? guestJoinURL.split("/").pop() : undefined,
+          },
+          roomName: `Session-${Date.now()}`,
+          callType:slot.callType,
+          duration: `${slot.duration} mins`,
+          startTime,
+          endTime,
+        },
+        status: "PENDING",
       });
 
-      // === 100ms Integration ===
-      const roomResponse = await axios.post(
-        "https://api.100ms.live/v2/rooms",
-        {
-          name: `slot-booking-${Date.now()}`,
-          description: "Mentorship Session",
-          template_id: process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const roomId = roomResponse.data.id;
-
-      // Generate room codes for host and guest
-      const hostCodeRes = await axios.post(
-        `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
-        {
-          name: "Jatin",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const guestCodeRes = await axios.post(
-        `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
-        {
-          name: "Mudit",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const hostJoinURL = `https://alter-videoconf-1123.app.100ms.live/meeting/${hostCodeRes.data.code}`;
-      const guestJoinURL = `https://alter-videoconf-1123.app.100ms.live/meeting/${guestCodeRes.data.code}`;
-
-      console.log("Mentor (Host) join link:", hostJoinURL);
-      console.log("Guest Host join link:", guestJoinURL);
-
-      // === Email setup ===
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
-        port: 587, // TLS port
+        port: 587,
         secure: false,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
         },
-        tls: {
-          rejectUnauthorized: true,
-        },
+        tls: { rejectUnauthorized: true },
       });
 
-      const mailOptions = {
+      // --- Send Email to USER ---
+      const userMailOptions = {
         from: process.env.SMTP_FROM,
         to: user.email,
         subject: "Your Mentor Slot Has Been Confirmed!",
         html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Slot Confirmation</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              background-color: #f4f4f4;
-              margin: 0;
-              padding: 20px;
-            }
-            .email-container {
-              max-width: 600px;
-              margin: 0 auto;
-              background-color: #ffffff;
-              padding: 20px;
-              border-radius: 5px;
-              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            }
-            .email-header {
-              text-align: center;
-              background-color: #4CAF50;
-              padding: 20px;
-              color: #ffffff;
-              border-radius: 5px 5px 0 0;
-            }
-            .email-body {
-              padding: 20px;
-              color: #333333;
-            }
-            .join-button {
-              display: inline-block;
-              padding: 15px 25px;
-              background-color: #4CAF50;
-              color: #ffffff;
-              text-decoration: none;
-              border-radius: 5px;
-              margin: 20px 0;
-            }
-            .join-button:hover {
-              background-color: #45a049;
-            }
-            .email-footer {
-              text-align: center;
-              font-size: 12px;
-              color: #999999;
-              margin-top: 20px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="email-container">
-            <div class="email-header">
-              <h1>Slot Confirmation</h1>
-            </div>
-            <div class="email-body">
-              <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
-              <p>Your mentor has <strong>accepted</strong> your request for a session!</p>
-              <p><strong>Mentor:</strong> ${mentor?.name?.firstName} ${
-          mentor?.name?.lastName
-        }</p>
-              <p><strong>Date:</strong> ${moment(slotData.slotsDate).format(
-                "lll"
-              )}</p>
-              <p><strong>Time:</strong> ${
-                slotData.slots.find((s) => s._id == slotId).time
-              }</p>
-              <p>You can join the session using the link below:</p>
-              <p><a href="${guestJoinURL}" class="join-button">Join Session</a></p>
-              <p>If you have any issues, feel free to contact support.</p>
-              <p>Thank you!</p>
-            </div>
-            <div class="email-footer">
-              <p>&copy; 2024 Your Company. All rights reserved.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>Slot Confirmation</title>
+                <style><!DOCTYPE html>
+              <html>
+              <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Slot Confirmation</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  background-color: #f4f4f4;
+                  margin: 0;
+                  padding: 20px;
+                }
+                .email-container {
+                  max-width: 600px;
+                  margin: 0 auto;
+                  background-color: #ffffff;
+                  padding: 20px;
+                  border-radius: 5px;
+                  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                }
+                .email-header {
+                  text-align: center;
+                  background-color: #4caf50;
+                  padding: 20px;
+                  color: #ffffff;
+                  border-radius: 5px 5px 0 0;
+                }
+                .email-body {
+                  padding: 20px;
+                  color: #333333;
+                }
+                .join-button {
+                  display: inline-block;
+                  padding: 15px 25px;
+                  background-color: #4caf50;
+                  color: #ffffff;
+                  text-decoration: none;
+                  border-radius: 5px;
+                  margin: 20px 0;
+                }
+                .join-button:hover {
+                  background-color: #45a049;
+                }
+                .email-footer {
+                  text-align: center;
+                  font-size: 12px;
+                  color: #999999;
+                  margin-top: 20px;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="email-container">
+                <div class="email-header">
+                  <h1>Slot Confirmation</h1>
+                </div>
+                <div class="email-body">
+                  <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
+                  <p>Your mentor <strong>${mentor.name.firstName} ${mentor.name.lastName}</strong> has confirmed your session!</p>
+                  <p>Click below to join your session:</p>
+                  <p style="text-align: center;">
+                    <a href="${guestJoinURL}" class="join-button">Join Session</a>
+                  </p>
+                  <p>If you have any questions, please contact support.</p>
+                  <p>Thank you!</p>
+                </div>
+                <div class="email-footer">
+                  <p>&copy; 2025 Alter Buddy. All rights reserved.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+  
+          `,
       };
+      await transporter.sendMail(userMailOptions);
 
-      transporter.sendMail(mailOptions, async (error, info) => {
-        if (error) {
-          console.log(error);
-        } else {
-          console.log("Email sent: " + info.response);
-          const slot = await CallSchedule.findOneAndUpdate(
-            {
-              "slots._id": slotId,
-            },
-            {
-              $set: {
-                "slots.$.status": "accepted",
-              },
-            }
-          );
-          return Ok(res, `Slot confirmed`);
-        }
-      });
+      // --- Send Email to MENTOR ---
+      const mentorMailOptions = {
+        from: process.env.SMTP_FROM,
+        to: mentor.contact.email,
+        subject: "New Mentorship Session Booked!",
+        html: `
+            <!DOCTYPE html>
+              <html>
+              <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Slot Confirmation</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  background-color: #f4f4f4;
+                  margin: 0;
+                  padding: 20px;
+                }
+                .email-container {
+                  max-width: 600px;
+                  margin: 0 auto;
+                  background-color: #ffffff;
+                  padding: 20px;
+                  border-radius: 5px;
+                  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                }
+                .email-header {
+                  text-align: center;
+                  background-color: #4caf50;
+                  padding: 20px;
+                  color: #ffffff;
+                  border-radius: 5px 5px 0 0;
+                }
+                .email-body {
+                  padding: 20px;
+                  color: #333333;
+                }
+                .join-button {
+                  display: inline-block;
+                  padding: 15px 25px;
+                  background-color: #4caf50;
+                  color: #ffffff;
+                  text-decoration: none;
+                  border-radius: 5px;
+                  margin: 20px 0;
+                }
+                .join-button:hover {
+                  background-color: #45a049;
+                }
+                .email-footer {
+                  text-align: center;
+                  font-size: 12px;
+                  color: #999999;
+                  margin-top: 20px;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="email-container">
+                <div class="email-header">
+                  <h1>Slot Confirmation</h1>
+                </div>
+                <div class="email-body">
+                  <p>Hi ${mentor.name.firstName} ${mentor.name.lastName},</p>
+                  <p>A new mentorship session has been booked by <strong>${user.name.firstName} ${user.name.lastName}</strong>.</p>
+                  <p>Click below to join the session:</p>
+                  <p style="text-align: center;" >
+                    <a href="${hostJoinURL}" class="join-button" style="background: #45a049; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Join as Mentor</a>
+                  </p>
+                  <p>If you have any issues, feel free to contact support.</p>
+                  <p>Thank you!</p>
+                </div>
+                <div class="email-footer">
+                  <p>&copy; 2025 Alter Buddy. All rights reserved.</p>
+                </div>
+              </div>
+            </body>
+            </html>`,
+      };
+      await transporter.sendMail(mentorMailOptions);
+
+      // === Update Slot Status ===
+      await CallSchedule.updateOne(
+        { "slots._id": slotId },
+        { $set: { "slots.$.status": "accepted" } }
+      );
+
+      return Ok(res, `Slot confirmed and chat created successfully`);
     } catch (err) {
-      console.log(err);
-      return UnAuthorized(res, err);
+      console.error("ConfirmSlotByMentor Error:", err);
+      return UnAuthorized(
+        res,
+        err instanceof Error ? err.message : "Unknown error occurred."
+      );
     }
   }
 

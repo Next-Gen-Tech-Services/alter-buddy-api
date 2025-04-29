@@ -20,6 +20,8 @@ const ChatSchema = new mongoose.Schema<IChatProps>(
         default: "audio",
       },
       duration: { type: mongoose.Schema.Types.String },
+      startTime: { type: mongoose.Schema.Types.String },
+      endTime: { type: mongoose.Schema.Types.String },
     },
     message: [
       {

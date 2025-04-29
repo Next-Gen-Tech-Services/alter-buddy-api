@@ -15,6 +15,8 @@ export interface IChatProps {
     description: string;
     callType: callType;
     duration: string;
+    startTime: string;
+    endTime: string;
   };
   message: [
     {

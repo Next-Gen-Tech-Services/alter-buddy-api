@@ -1,11 +1,12 @@
 import { IMentorCallScheduleProps } from "interface";
+import { duration } from "moment";
 import mongoose from "mongoose";
 
 const CallScheduleSchema = new mongoose.Schema<IMentorCallScheduleProps>(
      {
           mentorCode: { type: mongoose.Schema.Types.String,  },
           userCode: { type: mongoose.Schema.Types.String, },
-          callType: { type: mongoose.Schema.Types.String },
+        
           mentorId: {
                type: mongoose.Schema.Types.ObjectId,
                ref: "Mentor",
@@ -30,6 +31,14 @@ const CallScheduleSchema = new mongoose.Schema<IMentorCallScheduleProps>(
                          type: mongoose.Schema.Types.String,
                          enum: ["accepted", "rejected"],
                     },
+                    callType: {
+                         type: mongoose.Schema.Types.String,
+                         enum: ["audio", "video"],
+                    },
+                    duration: {
+                         type: Number,
+                    },
+                    
                     note: { type: mongoose.Schema.Types.String },
                },
           ],

@@ -3,7 +3,7 @@
   "JWT_SECRET": "alter-buddy",
   "NODE_NO_WARNINGS": 1,
   "SUPPRESS_NO_CONFIG_WARNING": false,
-  "JWT_EXPIRE": "3d",
+  "JWT_EXPIRE": "30d",
   "ABLY_KEY": "Fiv44w.ZkTEwA:O54qqKgcU-2KJh6IsbmDVAgf7pi7hNeWl5t72PVnOZI",
   "RAZORPAY_KEY_ID": "rzp_live_lboeng0vB0o9Nq",
   "RAZORPAY_KEY_SECRET": "AWfmChxIR41R1GBfLrZcZXQV",

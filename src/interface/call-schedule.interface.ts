@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import { IUserProps } from "./user.interface";
 
 export interface IMentorCallScheduleProps {
-     callType: ICallType;
      mentorId: mongoose.Schema.Types.ObjectId;
      slots: ISlotProps[];
      slotsDate: string;
@@ -17,6 +16,8 @@ export interface ISlotProps {
      booked: boolean;
      userId?: mongoose.Schema.Types.ObjectId;
      status: ISlotStatus;
+     callType: ICallType;
+     duration: number;
 }
 
 enum ISlotStatus {

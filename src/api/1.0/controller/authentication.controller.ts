@@ -367,9 +367,9 @@ export class AuthenticationController implements IController {
         config.get("JWT_SECRET"),
         { expiresIn: config.get("JWT_EXPIRE") }
       );
-      await User.findByIdAndUpdate(
+      await Mentor.findByIdAndUpdate(
         { _id: mentor._id },
-        { $set: { online: true } }
+        { $set: { "accountStatus.online": true } }
       );
       return Ok(res, {
         token,
@@ -422,9 +422,9 @@ export class AuthenticationController implements IController {
       const token = getTokenFromHeader(req);
       res.removeHeader("authorization");
       const verified = verifyToken(token);
-      await User.findByIdAndUpdate(
+      await Mentor.findByIdAndUpdate(
         { _id: verified.id },
-        { $set: { online: false } }
+        { $set: { "accountStatus.online": false } }
       );
       return Ok(res, `logout successful`);
     } catch (err) {
