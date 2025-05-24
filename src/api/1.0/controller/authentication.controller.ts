@@ -50,7 +50,7 @@ export class AuthenticationController implements IController {
       path: "/mentor/update/:id",
       handler: this.UpdateMentor,
       method: "PUT",
-      middleware: [AuthForAdmin],
+      middleware: [AuthForAdmin,AuthForMentor],
     });
 
     this.routes.push({
@@ -203,12 +203,12 @@ export class AuthenticationController implements IController {
       }: IMentorProps = req.body;
       if (
         !auth.password ||
-        !auth.username ||
-        !category ||
-        !contact.email ||
-        !name.firstName ||
-        !name.lastName ||
-        !languages
+        !auth.username 
+        // !category ||
+        // !contact.email ||
+        // !name.firstName ||
+        // !name.lastName ||
+        // !languages
       ) {
         return UnAuthorized(res, "missing fields");
       } else {
