@@ -50,7 +50,7 @@ export class AuthenticationController implements IController {
       path: "/mentor/update/:id",
       handler: this.UpdateMentor,
       method: "PUT",
-      middleware: [AuthForAdmin,AuthForMentor],
+      // middleware: [AuthForAdmin, AuthForMentor],
     });
 
     this.routes.push({
@@ -203,7 +203,7 @@ export class AuthenticationController implements IController {
       }: IMentorProps = req.body;
       if (
         !auth.password ||
-        !auth.username 
+        !auth.username
         // !category ||
         // !contact.email ||
         // !name.firstName ||
@@ -435,9 +435,14 @@ export class AuthenticationController implements IController {
   public UpdateMentor = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
+      console.log(id);
+      
       const token = getTokenFromHeader(req);
       res.removeHeader("authorization");
       const verified = verifyToken(token);
+      console.log('====================================');
+      console.log(verified);
+      console.log('====================================');
       if (verified.id) {
         const mentor = await Mentor.findByIdAndUpdate({ _id: id }, req.body);
         return Ok(res, mentor);
@@ -446,6 +451,8 @@ export class AuthenticationController implements IController {
       }
       return Ok(res, "Mentor updated successfully");
     } catch (err) {
+      console.log(err);
+      
       return UnAuthorized(res, err);
     }
   };
@@ -551,17 +558,17 @@ export class AuthenticationController implements IController {
           };
 
           var transporter = Nodemailer.createTransport({
-                  host: process.env.SMTP_HOST,
-                  port: 587, // TLS port
-                  secure: false,
-                  auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS,
-                  },
-                  tls: {
-                    rejectUnauthorized: true,
-                  },
-                });
+            host: process.env.SMTP_HOST,
+            port: 587, // TLS port
+            secure: false,
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASS,
+            },
+            tls: {
+              rejectUnauthorized: true,
+            },
+          });
           transporter.sendMail(mailOptions, function (error, info) {
             if (error) {
               console.log(error);
