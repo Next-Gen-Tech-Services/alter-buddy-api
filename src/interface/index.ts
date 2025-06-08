@@ -9,3 +9,4 @@ export * from "./post.interface";
 export * from "./notification.interface";
 export * from "./transaction.interface";
 export * from "./packages.interface";
+export * from "./group-session.interface";

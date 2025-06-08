@@ -8,6 +8,9 @@ import {
   HomeController,
   MentorController,
   MentorCallSchedule,
+  SessionPackageController,
+  MentorWalletController,
+  GroupSessionController,
   WebsiteController,
   PostController,
   WalletController,
@@ -49,6 +52,9 @@ export const registerRoutesV1 = (express: Express) => {
   routesHandler(express, new BlogController());
   routesHandler(express, new FeaturesController());
   routesHandler(express, new MentorCallSchedule());
+  routesHandler(express, new MentorWalletController());
+  routesHandler(express, new GroupSessionController());
+  routesHandler(express, new SessionPackageController());
   routesHandler(express, new WebsiteController());
   routesHandler(express, new PostController());
   routesHandler(express, new WalletController());

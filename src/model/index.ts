@@ -7,6 +7,8 @@ export * from "./top-mentor.model";
 export * from "./chat.model";
 export * from "./call-schedule.model";
 export * from "./post.model";
+export * from './session-package.model'
+export * from './group-session.model'
 export * from "./notification.model";
 export * from "./transaction.model";
 export * from "./packages.model";

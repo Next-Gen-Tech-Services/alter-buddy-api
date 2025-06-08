@@ -13,6 +13,7 @@ import nodemailer from "nodemailer";
 import mongoose from "mongoose";
 import { WalletController } from "./wallet.controller";
 import axios from "axios";
+import { MentorWallet } from "model/mentor-wallet.model";
 
 function generateRandomRoomId(length = 12): string {
   const characters =
@@ -124,6 +125,7 @@ export class MentorCallSchedule implements IController {
       return UnAuthorized(res, err);
     }
   }
+
   public async CreateCallSchedule(req: Request, res: Response) {
     try {
       const token = getTokenFromHeader(req);
@@ -229,6 +231,9 @@ export class MentorCallSchedule implements IController {
         packageType: callType,
         mentorId: mentor._id,
       }).lean();
+      console.log('====================================');
+      console.log(callType);
+      console.log('====================================');
       const userWallet = await BuddyCoins.findOne({ userId }).lean();
       if (!packages || !userWallet) {
         return UnAuthorized(res, "Package or Wallet not found.");
@@ -317,6 +322,21 @@ export class MentorCallSchedule implements IController {
       const endTime = new Date(startTime.getTime() + parseInt(time) * 60000); // Add minutes in milliseconds
 
       if (type != "slot") {
+        const totalAmount = packages.price * parseInt(time);
+        const mentorShare = totalAmount * 0.7;
+        const adminShare = totalAmount * 0.3;
+
+        await MentorWallet.create({
+          userId,
+          mentorId,
+          slotId: type === "slot" ? slotId : undefined,
+          amount: totalAmount,
+          mentorShare,
+          adminShare,
+          type: "debit",
+          status: "confirmed",
+          description: "User booked a mentor session",
+        });
         await Chat.create({
           users: {
             user: userId,
@@ -585,12 +605,35 @@ export class MentorCallSchedule implements IController {
       let hostJoinURL: string | undefined;
       let guestJoinURL: string | undefined;
       let roomId: string = generateRandomRoomId();
-console.log(slot);
 
-      const startTime = moment(`${slotData.slotsDate} ${slot.time}`, "YYYY-MM-DD hh:mm A");
+      const startTime = moment(
+        `${slotData.slotsDate} ${slot.time}`,
+        "YYYY-MM-DD hh:mm A"
+      );
+
+      const packages = await Packages.findOne({
+        packageType: slot?.callType,
+        mentorId: mentor._id,
+      }).lean();
+
+      const totalAmount = slot.duration * packages.price;
+      const mentorShare = totalAmount * 0.7;
+      const adminShare = totalAmount * 0.3;
+
+      await MentorWallet.create({
+        userId,
+        mentorId,
+        slotId,
+        amount: totalAmount,
+        mentorShare,
+        adminShare,
+        type: "credit",
+        status: "confirmed",
+        description: "Mentor confirmed session",
+      });
 
       // Step 2: Create endTime
-      const endTime = startTime.clone().add(slot.duration, 'minutes');
+      const endTime = startTime.clone().add(slot.duration, "minutes");
 
       await Chat.create({
         users: {
@@ -604,7 +647,7 @@ console.log(slot);
             mentor: guestJoinURL ? guestJoinURL.split("/").pop() : undefined,
           },
           roomName: `Session-${Date.now()}`,
-          callType:slot.callType,
+          callType: slot.callType,
           duration: `${slot.duration} mins`,
           startTime,
           endTime,
