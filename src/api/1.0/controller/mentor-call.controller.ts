@@ -231,9 +231,6 @@ export class MentorCallSchedule implements IController {
         packageType: callType,
         mentorId: mentor._id,
       }).lean();
-      console.log('====================================');
-      console.log(callType);
-      console.log('====================================');
       const userWallet = await BuddyCoins.findOne({ userId }).lean();
       if (!packages || !userWallet) {
         return UnAuthorized(res, "Package or Wallet not found.");
@@ -633,6 +630,54 @@ export class MentorCallSchedule implements IController {
       });
 
       // Step 2: Create endTime
+      const roomResponse = await axios.post(
+        "https://api.100ms.live/v2/rooms",
+        {
+          name: `slot-booking-${Date.now()}`,
+          description: "Mentorship Session",
+          template_id:
+            slot.callType === "video"
+              ? process.env.REACT_APP_100MD_SDK_VIDEO_TEMPLATE
+              : process.env.REACT_APP_100MD_SDK_AUDIO_TEMPLATE,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      roomId = roomResponse.data.id || roomId;
+
+      const [hostCodeRes, guestCodeRes] = await Promise.all([
+        axios.post(
+          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/host`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            },
+          }
+        ),
+        axios.post(
+          `https://api.100ms.live/v2/room-codes/room/${roomId}/role/guest`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REACT_APP_100MD_SDK_TOKEN}`,
+            },
+          }
+        ),
+      ]);
+
+      const baseURL =
+        slot.callType === "video"
+          ? process.env.REACT_APP_100MD_SDK_VIDEO_URL
+          : process.env.REACT_APP_100MD_SDK_AUDIO_URL;
+
+      hostJoinURL = `https://${baseURL}.app.100ms.live/meeting/${hostCodeRes.data.code}`;
+      guestJoinURL = `https://${baseURL}.app.100ms.live/meeting/${guestCodeRes.data.code}`;
       const endTime = startTime.clone().add(slot.duration, "minutes");
 
       await Chat.create({
@@ -655,6 +700,10 @@ export class MentorCallSchedule implements IController {
         status: "PENDING",
       });
 
+      const formattedDate = startTime.format("dddd, MMMM Do YYYY"); // e.g. Monday, June 10th 2025
+      const formattedTime = startTime.format("hh:mm A"); // e.g. 04:00 PM
+      const formattedDuration = `${slot.duration} minutes`; // e.g. 30 minutes
+
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: 587,
@@ -667,93 +716,87 @@ export class MentorCallSchedule implements IController {
       });
 
       // --- Send Email to USER ---
+     
       const userMailOptions = {
         from: process.env.SMTP_FROM,
         to: user.email,
         subject: "Your Mentor Slot Has Been Confirmed!",
         html: `
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta charset="UTF-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <title>Slot Confirmation</title>
-                <style><!DOCTYPE html>
-              <html>
-              <head>
-              <meta charset="UTF-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>Slot Confirmation</title>
-              <style>
-                body {
-                  font-family: Arial, sans-serif;
-                  background-color: #f4f4f4;
-                  margin: 0;
-                  padding: 20px;
-                }
-                .email-container {
-                  max-width: 600px;
-                  margin: 0 auto;
-                  background-color: #ffffff;
-                  padding: 20px;
-                  border-radius: 5px;
-                  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-                }
-                .email-header {
-                  text-align: center;
-                  background-color: #4caf50;
-                  padding: 20px;
-                  color: #ffffff;
-                  border-radius: 5px 5px 0 0;
-                }
-                .email-body {
-                  padding: 20px;
-                  color: #333333;
-                }
-                .join-button {
-                  display: inline-block;
-                  padding: 15px 25px;
-                  background-color: #4caf50;
-                  color: #ffffff;
-                  text-decoration: none;
-                  border-radius: 5px;
-                  margin: 20px 0;
-                }
-                .join-button:hover {
-                  background-color: #45a049;
-                }
-                .email-footer {
-                  text-align: center;
-                  font-size: 12px;
-                  color: #999999;
-                  margin-top: 20px;
-                }
-              </style>
-            </head>
-            <body>
-              <div class="email-container">
-                <div class="email-header">
-                  <h1>Slot Confirmation</h1>
-                </div>
-                <div class="email-body">
-                  <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
-                  <p>Your mentor <strong>${mentor.name.firstName} ${mentor.name.lastName}</strong> has confirmed your session!</p>
-                  <p>Click below to join your session:</p>
-                  <p style="text-align: center;">
-                    <a href="${guestJoinURL}" class="join-button">Join Session</a>
-                  </p>
-                  <p>If you have any questions, please contact support.</p>
-                  <p>Thank you!</p>
-                </div>
-                <div class="email-footer">
-                  <p>&copy; 2025 Alter Buddy. All rights reserved.</p>
-                </div>
-              </div>
-            </body>
-            </html>
-  
-          `,
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Session Confirmation</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            max-width: 600px;
+            margin: 30px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          }
+          .header {
+            background-color: #4caf50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            margin: 20px 0;
+            color: #333;
+          }
+          .join-button {
+            display: block;
+            width: fit-content;
+            margin: 20px auto;
+            padding: 15px 25px;
+            background-color: #4caf50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+          }
+          .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Session Confirmed</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${user.name.firstName} ${user.name.lastName},</p>
+            <p><strong>Your mentor ${mentor.name.firstName} ${mentor.name.lastName} has confirmed your session!</strong></p>
+            <p>🗓 <strong>Date:</strong> ${formattedDate}</p>
+            <p>⏰ <strong>Time:</strong> ${formattedTime}</p>
+            <p>⏳ <strong>Duration:</strong> ${formattedDuration}</p>
+            <a href="${guestJoinURL}" class="join-button">👉 Join Session</a>
+            <p>Please join 5 minutes before your scheduled time. Being late may reduce your available session time.</p>
+            <p>If you have any questions, feel free to contact our support team.</p>
+          </div>
+          <div class="footer">
+            <p>©️ 2025 AlterBuddy. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `,
       };
+
       await transporter.sendMail(userMailOptions);
 
       // --- Send Email to MENTOR ---
