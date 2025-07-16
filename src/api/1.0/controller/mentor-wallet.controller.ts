@@ -26,7 +26,8 @@ export class MentorWalletController implements IController {
 
       const transactions = await MentorWallet.find({
         mentorId: mentor.id,
-      })
+      }) .populate("mentorId", "name") // populating mentor's name
+        .populate("userId", "name") // populating user's name
         .sort({ createdAt: -1 })
         .lean();
 

@@ -25,6 +25,18 @@ export class GroupSessionController implements IController {
         method: "PUT",
         handler: this.BookGroupSession,
       },
+      {
+        path: "/group-session/:id",
+        method: "PATCH",
+        handler: this.UpdateGroupSession,
+        middleware: [AuthForMentor],
+      },
+      {
+        path: "/group-session/:id",
+        method: "DELETE",
+        handler: this.DeleteGroupSession,
+        middleware: [AuthForMentor],
+      },
     ];
   }
 
@@ -91,6 +103,36 @@ export class GroupSessionController implements IController {
       await session.save();
 
       return Ok(res, session);
+    } catch (err) {
+      return UnAuthorized(res, err);
+    }
+  }
+
+  public async UpdateGroupSession(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+
+      const updated = await GroupSession.findByIdAndUpdate(id, updates, {
+        new: true,
+      });
+
+      if (!updated) return UnAuthorized(res, "Session not found");
+
+      return Ok(res, updated);
+    } catch (err) {
+      return UnAuthorized(res, err);
+    }
+  }
+
+  public async DeleteGroupSession(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const deleted = await GroupSession.findByIdAndDelete(id);
+      if (!deleted) return UnAuthorized(res, "Session not found");
+
+      return Ok(res, { message: "Session deleted successfully" });
     } catch (err) {
       return UnAuthorized(res, err);
     }

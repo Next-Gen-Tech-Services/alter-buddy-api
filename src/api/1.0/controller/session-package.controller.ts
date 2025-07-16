@@ -30,6 +30,18 @@ export class SessionPackageController implements IController {
         handler: this.GetMentorCreatedPackages,
         middleware: [AuthForMentor],
       },
+      {
+        path: "/session/package/:id",
+        method: "PATCH",
+        handler: this.UpdatePackage,
+        middleware: [AuthForMentor],
+      },
+      {
+        path: "/session/package/:id",
+        method: "DELETE",
+        handler: this.DeletePackage,
+        middleware: [AuthForMentor],
+      },
     ];
   }
 
@@ -96,6 +108,7 @@ export class SessionPackageController implements IController {
       return UnAuthorized(res, err);
     }
   }
+
   public async GetMentorCreatedPackages(req: Request, res: Response) {
     try {
       const { mentorId } = req.params;
@@ -104,6 +117,36 @@ export class SessionPackageController implements IController {
         "categoryId"
       );
       return Ok(res, packages);
+    } catch (err) {
+      return UnAuthorized(res, err);
+    }
+  }
+
+  public async UpdatePackage(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+
+      const updated = await SessionPackage.findByIdAndUpdate(id, updates, {
+        new: true,
+      });
+
+      if (!updated) return UnAuthorized(res, "Package not found");
+
+      return Ok(res, updated);
+    } catch (err) {
+      return UnAuthorized(res, err);
+    }
+  }
+
+  public async DeletePackage(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const deleted = await SessionPackage.findByIdAndDelete(id);
+      if (!deleted) return UnAuthorized(res, "Package not found");
+
+      return Ok(res, { message: "Deleted successfully" });
     } catch (err) {
       return UnAuthorized(res, err);
     }

@@ -13,7 +13,7 @@ export interface IController {
      routes: IControllerRoutes[];
 }
 
-export type METHOD = "GET" | "PUT" | "HEAD" | "POST" | "DELETE";
+export type METHOD = "GET" | "PUT" | "HEAD" | "POST" | "DELETE" | "PATCH";
 
 export enum STATUS_CODES {
      OK = 200,

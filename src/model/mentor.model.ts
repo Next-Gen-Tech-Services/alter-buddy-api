@@ -54,7 +54,7 @@ const MentorSchema = new mongoose.Schema<IMentorProps>(
     },
     acType: { type: mongoose.Schema.Types.String, default: "MENTOR" },
     inCall: { type: mongoose.Schema.Types.Boolean, default: false },
-    isUnavailable: { type: mongoose.Schema.Types.Boolean, default: true },
+    isUnavailable: { type: mongoose.Schema.Types.Boolean, default: false },
     videoLink: { type: mongoose.Schema.Types.String },
     description: { type: mongoose.Schema.Types.String },
     image: {
@@ -80,6 +80,7 @@ const MentorSchema = new mongoose.Schema<IMentorProps>(
         // required: true
       },
     ],
+    maxSlotTime: { type: mongoose.Schema.Types.Number },
   },
   {
     timestamps: true,

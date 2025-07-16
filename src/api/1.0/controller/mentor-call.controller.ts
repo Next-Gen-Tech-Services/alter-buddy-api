@@ -5,7 +5,7 @@ import {
   IMentorCallScheduleProps,
   ISlotProps,
 } from "interface";
-import { AuthForMentor } from "middleware";
+import { AuthForMentor, AuthForUser } from "middleware";
 import { BuddyCoins, CallSchedule, Chat, Mentor, Packages, User } from "model";
 import { Ok, UnAuthorized, getTokenFromHeader, verifyToken } from "utils";
 import moment from "moment-timezone";
@@ -83,6 +83,13 @@ export class MentorCallSchedule implements IController {
       path: "/mentor/calls",
     });
     this.routes.push({
+      handler: this.GetUserCalls,
+      method: "GET",
+      path: "/user/calls",
+      middleware:[AuthForUser]
+    });
+
+    this.routes.push({
       handler: this.UpdateSlot,
       method: "PUT",
       path: "/mentor/slot/:slotId",
@@ -104,6 +111,19 @@ export class MentorCallSchedule implements IController {
       const token = getTokenFromHeader(req);
       const id = verifyToken(token);
       const calls = await Chat.find({ "users.mentor": id.id })
+        .populate("users.mentor")
+        .populate("users.user");
+      return Ok(res, calls);
+    } catch (err) {
+      return UnAuthorized(res, err);
+    }
+  }
+
+   public async GetUserCalls(req: Request, res: Response) {
+    try {
+      const token = getTokenFromHeader(req);
+      const id = verifyToken(token);
+      const calls = await Chat.find({ "users.user": id.id })
         .populate("users.mentor")
         .populate("users.user");
       return Ok(res, calls);
@@ -716,7 +736,7 @@ export class MentorCallSchedule implements IController {
       });
 
       // --- Send Email to USER ---
-     
+
       const userMailOptions = {
         from: process.env.SMTP_FROM,
         to: user.email,

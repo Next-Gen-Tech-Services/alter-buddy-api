@@ -39,6 +39,8 @@ export interface IMentorProps {
   status: boolean;
   qualification: string;
   whatCanAsk?: string[];
+  maxSlotTime: number;
+
 }
 
 export interface ICategoryProps {
