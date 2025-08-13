@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { IControllerRoutes, IController } from "interface";
 import { AuthForAdmin, AuthForUser } from "middleware";
 import { User, BuddyCoins, Transaction } from "model";
+import { Types } from "mongoose";
 import { RazorPayService } from "services/razorpay.services";
 import { getTokenFromHeader, Ok, UnAuthorized, verifyToken } from "utils";
 
@@ -43,13 +44,19 @@ export class WalletController implements IController {
       handler: this.GetAllWallets,
       method: "GET",
       middleware: [AuthForAdmin],
-    }),
-      this.routes.push({
-        path: "/buddy-coins",
-        handler: this.GetMyWallet,
-        method: "GET",
-        middleware: [AuthForUser],
-      });
+    });
+    this.routes.push({
+      path: "/wallets/:userId/transactions",
+      handler: this.GetTransactionsByUserIdForAdmin,
+      method: "GET",
+      middleware: [AuthForAdmin],
+    });
+    this.routes.push({
+      path: "/buddy-coins",
+      handler: this.GetMyWallet,
+      method: "GET",
+      middleware: [AuthForUser],
+    });
     this.routes.push({
       handler: this.CreateBuddyCoinsRecharge,
       method: "POST",
@@ -80,6 +87,24 @@ export class WalletController implements IController {
       return UnAuthorized(res, err);
     }
   };
+
+  public async GetTransactionsByUserIdForAdmin(req: Request, res: Response) {
+    try {
+      const { userId } = req.params;
+      if (!userId) {
+        return UnAuthorized(res, "Invalid userId");
+      }
+
+      const transactions = await Transaction.find({ userId })
+        .populate("walletId")
+        .populate("userId")
+        .sort({ createdAt: -1 }); // newest first
+
+      return Ok(res, transactions);
+    } catch (err) {
+      return UnAuthorized(res, err);
+    }
+  }
 
   public async GetMyWallet(req: Request, res: Response) {
     try {
